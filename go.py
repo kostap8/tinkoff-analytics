@@ -17,7 +17,8 @@ class Positions(BaseModel):
 
 
 TOKEN = os.getenv("TINKOFF_TOKEN")
-ACCOUNT_TYPE = 'TinkoffIis'
+#ACCOUNT_TYPE = 'TinkoffIis'
+ACCOUNT_TYPE = os.getenv("TINKOFF_ACC_TYPE")
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 PLAN_FILE = os.getenv("PLAN_FILE")
 
@@ -102,6 +103,17 @@ def get_etf_plan(etfs: list):
                     etf.weigth_exp = Decimal(sline[1].replace(',','.'))
 
 
+def get_operations_payin_sum() -> int:
+    """Возвращает сумму всех пополнений в рублях"""
+    operations = tapi.get_all_operations()
+
+    sum_pay_in = Decimal('0')
+    for operation in operations:
+        if operation.operation_type == TinkoffApi.OperationTypeWithCommission.pay_in:
+            #print(operation)
+            sum_pay_in += operation.payment
+    return int(sum_pay_in)
+
 if __name__ ==  "__main__":
     portfolio_positions_sum = get_portfolio_positions_sum()
     print(f"\n")
@@ -110,7 +122,14 @@ if __name__ ==  "__main__":
     print(f"Стоимость кэша: {portfolio_currencies_sum:n} руб")
     portfolio_sum = portfolio_positions_sum + portfolio_currencies_sum
     print(f"Стоимость портфеля: {portfolio_sum:n} руб")
+
+    sum_pay_in = get_operations_payin_sum()
+    print(f"Сумма пополнений: {sum_pay_in:n} руб")
+    profit_in_rub = portfolio_sum - sum_pay_in
+    profit_in_percent = round(profit_in_rub * 100 / sum_pay_in, 2)
+    print(f"Рублёвая прибыль: {profit_in_rub:n} руб ({profit_in_percent:n}%)")
     print(f"\n")
+    
     etfs = get_etf_weigth()
     get_etf_plan(etfs)
     for etf in etfs:

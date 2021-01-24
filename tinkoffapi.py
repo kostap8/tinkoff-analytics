@@ -3,8 +3,11 @@ from decimal import Decimal
 from typing import List
 import json
 from pprint import pprint
+from utils import localize, get_now
 
 import tinvest
+
+OPERATIONS_FROM='2000-01-01T00:00:00.000000+03:00'
 
 #from utils import localize, get_now
 
@@ -12,6 +15,7 @@ class TinkoffApi:
     """Обёртка для работы с API Тинькова на основе библиотеки tinvest"""
     Currency = tinvest.Currency
     InstrumentType = tinvest.InstrumentType
+    OperationTypeWithCommission = tinvest.OperationTypeWithCommission
 
     def __init__(self, api_token: str, account_type: str):
         self._client = tinvest.SyncClient(api_token)
@@ -24,7 +28,7 @@ class TinkoffApi:
         for account in accounts:
             if account.broker_account_type == self._account_type:
                 self._account_id = account.broker_account_id
-                pprint(account)
+                #pprint(account)
 
 
     def get_usd_course(self) -> Decimal:
@@ -54,15 +58,14 @@ class TinkoffApi:
         return positions
 
 
-    def get_all_operations(self, broker_account_started_at: datetime) \
+    def get_all_operations(self, from_in: datetime = OPERATIONS_FROM) \
                 -> List[tinvest.schemas.Operation]:
-        """Возвращает все операции в портфеле с указанной даты"""
-        from_ = localize(broker_account_started_at)
+        """Возвращает все операции в портфеле 'с' и 'по' указанные даты"""
+        #from_ = localize(from_in)
+        from_ = from_in
         now = get_now()
 
-        operations = tinvest\
-            .OperationsApi(self._client)\
-            .operations_get(broker_account_id=self._broker_account_id, from_=from_, to=now)\
-            .parse_json().payload.operations
+        operations = self._client.get_operations(broker_account_id=self._account_id, from_=from_, to=now)\
+            .payload.operations
         return operations
 
