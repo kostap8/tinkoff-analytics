@@ -7,14 +7,25 @@ from decimal import Decimal
 from pydantic import BaseModel
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from tabulate import tabulate
+from utils import localize, get_now
+from datetime import datetime
 
 class Positions(BaseModel):
+    """ Позиции в портфеле """
+    """ Тикер """
     ticker: str = ''
+    """ Стоимость """
     ticker_cost: Decimal = Decimal(0)
+    """ Ожидаемый процент в портфеле """
     weigth_exp: Decimal = Decimal(0)
+    """ Текущий процент в портфеле """
     weigth_cur: Decimal = Decimal(0)
+    """ Разница между ожидаемым и текущим процентами """
     weigth_diff: Decimal = Decimal(0)
 
+OPERATIONS_FROM = '2000-01-01T00:00:00.000000+03:00'
+OPERATIONS_FROM_YEAR = '2020-01-01T00:00:00.000000+00:00'
+OPERATIONS_TO_YEAR = '2021-01-01T00:00:00.000000+00:00'
 
 TOKEN = os.getenv("TINKOFF_TOKEN")
 #ACCOUNT_TYPE = 'TinkoffIis'
@@ -101,17 +112,32 @@ def get_etf_plan(etfs: list):
             for etf in etfs:
                 if etf.ticker == sline[0]:
                     etf.weigth_exp = Decimal(sline[1].replace(',','.'))
+                    break
+            else:
+                new_etf = Positions(ticker=sline[0])
+                new_etf.ticker_cost = 0
+                new_etf.weigth_cur = 0
+                new_etf.weigth_exp = Decimal(sline[1].replace(',','.'))
+                etfs.append(new_etf)
 
 
-def get_operations_payin_sum() -> int:
+def get_operations_payin_sum(from_in: datetime = OPERATIONS_FROM, to_in: datetime = get_now()) -> int:
     """Возвращает сумму всех пополнений в рублях"""
-    operations = tapi.get_all_operations()
+    operations = tapi.get_all_operations(from_in, to_in)
 
     sum_pay_in = Decimal('0')
     for operation in operations:
-        if operation.operation_type == TinkoffApi.OperationTypeWithCommission.pay_in:
+        #print(operation.operation_type)
+        if (operation.operation_type == TinkoffApi.OperationTypeWithCommission.pay_in \
+            or operation.operation_type == TinkoffApi.OperationTypeWithCommission.pay_out) \
+            and operation.status == TinkoffApi.OperationStatus.done:
             #print(operation)
-            sum_pay_in += operation.payment
+            sum_pay = operation.payment
+            if operation.currency == TinkoffApi.Currency.usd:
+                sum_pay *= usd_course
+            if operation.currency == TinkoffApi.Currency.eur:
+                sum_pay *= eur_course
+            sum_pay_in += sum_pay
     return int(sum_pay_in)
 
 if __name__ ==  "__main__":
@@ -122,6 +148,9 @@ if __name__ ==  "__main__":
     print(f"Стоимость кэша: {portfolio_currencies_sum:n} руб")
     portfolio_sum = portfolio_positions_sum + portfolio_currencies_sum
     print(f"Стоимость портфеля: {portfolio_sum:n} руб")
+
+    sum_pay_in_year = get_operations_payin_sum(OPERATIONS_FROM_YEAR, OPERATIONS_TO_YEAR)
+    print(f"Сумма пополнений за 2020: {sum_pay_in_year:n} руб")
 
     sum_pay_in = get_operations_payin_sum()
     print(f"Сумма пополнений: {sum_pay_in:n} руб")

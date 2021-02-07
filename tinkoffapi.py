@@ -3,19 +3,15 @@ from decimal import Decimal
 from typing import List
 import json
 from pprint import pprint
-from utils import localize, get_now
 
 import tinvest
-
-OPERATIONS_FROM='2000-01-01T00:00:00.000000+03:00'
-
-#from utils import localize, get_now
 
 class TinkoffApi:
     """Обёртка для работы с API Тинькова на основе библиотеки tinvest"""
     Currency = tinvest.Currency
     InstrumentType = tinvest.InstrumentType
     OperationTypeWithCommission = tinvest.OperationTypeWithCommission
+    OperationStatus = tinvest.OperationStatus
 
     def __init__(self, api_token: str, account_type: str):
         self._client = tinvest.SyncClient(api_token)
@@ -58,14 +54,11 @@ class TinkoffApi:
         return positions
 
 
-    def get_all_operations(self, from_in: datetime = OPERATIONS_FROM) \
+    def get_all_operations(self, from_in: datetime, to_in: datetime) \
                 -> List[tinvest.schemas.Operation]:
         """Возвращает все операции в портфеле 'с' и 'по' указанные даты"""
-        #from_ = localize(from_in)
-        from_ = from_in
-        now = get_now()
 
-        operations = self._client.get_operations(broker_account_id=self._account_id, from_=from_, to=now)\
+        operations = self._client.get_operations(broker_account_id=self._account_id, from_=from_in, to=to_in)\
             .payload.operations
         return operations
 
